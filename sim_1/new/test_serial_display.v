@@ -22,7 +22,30 @@
 
 `timescale 1ns/1ps
 
+`define SS_0 8'b00000011
+`define SS_1 8'b10011111
+`define SS_2 8'b00100101
+`define SS_3 8'b00001101
+`define SS_4 8'b10011001
+`define SS_5 8'b01001001
+`define SS_6 8'b01000001
+`define SS_7 8'b00011111
+`define SS_8 8'b00000001
+`define SS_9 8'b00001001
+`define SS_A 8'b00010001
+`define SS_B 8'b11000001
+`define SS_C 8'b01100011
+`define SS_D 8'b10000101
+`define SS_E 8'b01100001
+`define SS_F 8'b01110001
+
 module test_serial_display();
+    parameter [127:0] SEVEN_SEG_CODE = {
+        `SS_F, `SS_E, `SS_D, `SS_C, `SS_B, `SS_A, `SS_9, `SS_8,
+        `SS_7, `SS_6, `SS_5, `SS_4, `SS_3, `SS_2, `SS_1, `SS_0
+    };
+
+    parameter DELAY = 5;
 
     reg [7:0] ascii_data;               
     reg data_valid;                     
@@ -36,94 +59,59 @@ module test_serial_display();
         .seven_segment_enable(seven_segment_enable)
     );
 
-    integer i;
-    reg [7:0] expected_seven_segment_data;
-    reg [3:0] expected_seven_segment_enable;
-    reg test_passed;
-
-    // Expected values for ASCII to 7-segment mapping (example, should be replaced with actual mapping)
-    function [7:0] ascii_to_7seg_data;
-        input [7:0] ascii;
-        case (ascii)
-            8'd48: ascii_to_7seg_data = 8'b11000000; // '0'
-            8'd49: ascii_to_7seg_data = 8'b11111001; // '1'
-            8'd50: ascii_to_7seg_data = 8'b10100100; // '2'
-            8'd51: ascii_to_7seg_data = 8'b10110000; // '3'
-            8'd52: ascii_to_7seg_data = 8'b10011001; // '4'
-            8'd53: ascii_to_7seg_data = 8'b10010010; // '5'
-            8'd54: ascii_to_7seg_data = 8'b10000010; // '6'
-            8'd55: ascii_to_7seg_data = 8'b11111000; // '7'
-            8'd56: ascii_to_7seg_data = 8'b10000000; // '8'
-            8'd57: ascii_to_7seg_data = 8'b10010000; // '9'
-            8'd65: ascii_to_7seg_data = 8'b10001000; // 'A'
-            8'd66: ascii_to_7seg_data = 8'b10000011; // 'B'
-            8'd67: ascii_to_7seg_data = 8'b11000110; // 'C'
-            8'd68: ascii_to_7seg_data = 8'b10100001; // 'D'
-            8'd69: ascii_to_7seg_data = 8'b10000110; // 'E'
-            8'd70: ascii_to_7seg_data = 8'b10001110; // 'F'
-            default: ascii_to_7seg_data = 8'b11111111; // Invalid input
-        endcase
-    endfunction
-
-    function [3:0] ascii_to_7seg_enable;
-        input [7:0] ascii;
-        if ((ascii >= 8'd48 && ascii <= 8'd57) || (ascii >= 8'd65 && ascii <= 8'd70))
-            ascii_to_7seg_enable = 4'b1110; // Example enable pattern
-        else
-            ascii_to_7seg_enable = 4'b0000; // Invalid input
-    endfunction
-
+    integer i, error_count;
     initial begin
         ascii_data = 8'd0;
+        #DELAY;
         data_valid = 1'b0;
-        test_passed = 1'b1;
+
+        error_count = 0;
 
         $display("Starting Testbench...");
-        $monitor("Time: %0t | ASCII Data: %h | Data Valid: %b | 7-Segment Data: %b | Enable: %b | Expected Data: %b | Expected Enable: %b", 
-                 $time, ascii_data, data_valid, seven_segment_data, seven_segment_enable, expected_seven_segment_data, expected_seven_segment_enable);
+        $monitor("Time: %0t | ASCII Data: %h | Data Valid: %b | 7-Segment Data: %b | Enable: %b", 
+                 $time, ascii_data, data_valid, seven_segment_data, seven_segment_enable);
 
-        // Test valid ASCII range: '0'-'9'
         $display("Testing valid ASCII range: '0'-'9'");
         for (i = 48; i <= 57; i = i + 1) begin
-            #5;
             ascii_data = i;
+            #DELAY;
             data_valid = 1'b1;
-            expected_seven_segment_data = ascii_to_7seg_data(i);
-            expected_seven_segment_enable = ascii_to_7seg_enable(i);
-            #5;
-            data_valid = 1'b0;
+            #DELAY;
 
-            if (seven_segment_data !== expected_seven_segment_data || seven_segment_enable !== expected_seven_segment_enable) begin
-                $display("FAIL: ASCII %h | Expected: %b, %b | Got: %b, %b", ascii_data, expected_seven_segment_data, expected_seven_segment_enable, seven_segment_data, seven_segment_enable);
-                test_passed = 1'b0;
+            if (seven_segment_data !== SEVEN_SEG_CODE[(i - 48) * 8 +: 8]) begin
+                $display("ERROR: ASCII Data: %h | Expected 7-Segment Data: %b | Actual 7-Segment Data: %b", 
+                         ascii_data, SEVEN_SEG_CODE[(i - 48) * 8 +: 8], seven_segment_data);
+                error_count = error_count + 1;
             end
+
+            #DELAY data_valid = 1'b0;
         end
 
-        // Test valid ASCII range: 'A'-'F'
         $display("Testing valid ASCII range: 'A'-'F'");
         for (i = 65; i <= 70; i = i + 1) begin
-            #5;
             ascii_data = i;
+            #DELAY;
             data_valid = 1'b1;
-            expected_seven_segment_data = ascii_to_7seg_data(i);
-            expected_seven_segment_enable = ascii_to_7seg_enable(i);
-            #5;
-            data_valid = 1'b0;
+            #DELAY;
 
-            if (seven_segment_data !== expected_seven_segment_data || seven_segment_enable !== expected_seven_segment_enable) begin
-                $display("FAIL: ASCII %h | Expected: %b, %b | Got: %b, %b", ascii_data, expected_seven_segment_data, expected_seven_segment_enable, seven_segment_data, seven_segment_enable);
-                test_passed = 1'b0;
+            if (seven_segment_data !== SEVEN_SEG_CODE[(i - 55) * 8 +: 8]) begin
+                $display("ERROR: ASCII Data: %h | Expected 7-Segment Data: %b | Actual 7-Segment Data: %b", 
+                         ascii_data, SEVEN_SEG_CODE[(i - 55) * 8 +: 8], seven_segment_data);
+                error_count = error_count + 1;
             end
+
+            #DELAY data_valid = 1'b0;
         end
 
-        #10;
-        if (test_passed) $display("All tests PASSED.");
-        else $display("Some tests FAILED.");
-
+        #(2 * DELAY);
+        if (error_count === 0) begin
+            $display("All tests passed.");
+        end else begin
+            $display("ERROR: %d tests failed.", error_count);
+        end
+        $display("Testbench completed.");
         $stop;
     end
 
 endmodule
 
-
-//直接顯示比對結果
